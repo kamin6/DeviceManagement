@@ -1,0 +1,39 @@
+<div>
+  <h2>{{memberId}} Devices</h2>
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Device ID</th>
+          <th>Name</th>
+          <th>Location</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {%- for t in table %}
+        <form action="/devices/edit/{{memberId}}/{{t[0]}}">
+        <tr>
+          <td><input class="row_{{t[0]}}" id="DEVICE_ID" name="DEVICE_ID" required value="{{ t[0] }}"></td>
+          <td><input class="row_{{t[0]}}" id="DEVICE_NAME" name="DEVICE_NAME" required value="{{ t[1] }}"></td>
+          <td><input class="row_{{t[0]}}" id="LOCATION" name="LOCATION" required value="{{ t[2] }}"></td>
+          <td>
+            <button type="submit" class="btn btn-default">Save Changes</button>
+            <a type="button" class="btn btn-default" href="/devices/delete/{{memberId}}/{{t[0]}}">Delete</a>
+          </td>
+        </tr>
+        </form>
+        {%- endfor %}
+      </tbody>
+    </table>
+  <form action="/devices/add/{{memberId}}">
+  <label>Device ID</label>
+  <input id="DEVICE_ID" name="DEVICE_ID" required placeholder="ABCD1234">
+
+  <label>Device Name</label>
+  <input id="DEVICE_NAME" name="DEVICE_NAME" placeholder="ECHO SHOW 8">
+
+  <label>Location</label>
+  <input id="LOCATION" name="LOCATION" placeholder="HOME">
+  <button type="submit" class="btn btn-default">Add Device</button>
+</form>
+</div>

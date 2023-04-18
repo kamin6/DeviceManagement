@@ -9,7 +9,9 @@
 <body>
   {% include 'nav.html' %}
 	<main>
-		{% include 'devices_table.html' %}
+    {%- for table in tables %}
+    {% include 'devices_table.html' %}
+    {%- endfor %}
 	</main>
   </div>
 </body>
