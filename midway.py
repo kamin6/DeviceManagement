@@ -1,53 +1,55 @@
-import http
 import requests
-import urllib.parse
-
+from urllib.parse import urlparse
+import logging
+import http.cookiejar as cookielib
+import re
+import getpass
+import os
+ 
+logger=logging.getLogger()
+ 
 MIDWAY_ENDPOINT = 'https://midway-auth.amazon.com'
-USERNAME = 'khushami'  # TBD
-PASSWORD = ''  # TBD
-COOKIE_FILE = '' #TBD, mwinit uses ~/.midway/cookie
-
+USERNAME = getpass.getuser() 
+COOKIE_FILE = os.path.expanduser("~") + '/.midway/cookie' 
+ 
 def resp_info(response):
-   return '{}:{}:{}:{}'.format(
-       response.headers.get('x-host'),
-       response.headers.get('x-request-id'),
-       response.status_code,
-       response.text)
-
-# Will store cookies in the same format as mwinit
-cookie_jar = http.cookiejar.MozillaCookieJar(COOKIE_FILE)
-session = requests.Session()
-session.cookies = cookie_jar
-
-# Get CSRF token
-session_status_url = urllib.parse.urljoin(MIDWAY_ENDPOINT, '/api/session-status')
-response = session.get(session_status_url)
-if not response.ok:
-   print('Error while getting  session status: %s', resp_info(response))
-
-json_response = response.json()
-csrf_param = json_response['csrf_param']
-csrf_token = json_response['csrf_token']
-
-# Login
-login_url = urllib.parse.urljoin(MIDWAY_ENDPOINT, '/api/login')
-login_data = {
-   'format': 'json',
-   'user_name': USERNAME,
-   'password': PASSWORD,
-   csrf_param: csrf_token,
-}
-print('Testing with user %s', USERNAME)
-# You need to send CSRF token and session cookie you received from previous step
-response = session.post(login_url, data=login_data)
-if not response.ok:
-   print('Login failed: %s', resp_info(response))
-
-# If Sentry is used behind the service, you need to opt-in to Sentry to Midway flow,
-# This will add a cookie that will begin redirecting your subsequent authentication requests from Sentry to Midway.
-# https://w.amazon.com/index.php/Sentry/Regionalized%20Identity/Sentry%20To%20Midway 
-response = session.post('https://sentry.amazon.com/sentry-braveheart?value=1')
-if not response.ok:
-   print('Sentry authentication redirect failed: %s', resp_info(response))
-
-print(response)
+    return '{}:{}:{}:{}'.format(
+        response.headers.get('x-host'),
+        response.headers.get('x-request-id'),
+        response.status_code,
+        response.text)
+ 
+def request_follow_redirects(session, url, headers, data, max_hops=10):
+    if max_hops < 0:
+        return False
+    max_hops -= 1
+    response = session.post(url, data=data, headers=headers , allow_redirects=False)
+    if response.status_code == 302 or response.status_code == 307:
+        return request_follow_redirects(session, response.headers['Location'], headers, data)
+    else:
+        return response
+ 
+ 
+def test_isengard_hello(url):
+    # If Sentry is used behind the service, you need to opt-in to Sentry to Midway flow,
+    # This will add a cookie that will begin redirecting your subsequent authentication requests from Sentry to Midway.
+    # https://w.amazon.com/index.php/Sentry/Regionalized%20Identity/Sentry%20To%20Midway     
+    session = requests.Session()
+    session.allow_redirects = False
+    session.max_redirects = 5
+    session.verify = "/etc/pki/tls/certs/ca-bundle.crt"
+    response = session.post('https://sentry.amazon.com/sentry-braveheart?value=1')
+    if not response.ok:
+        print("sentry error")
+        exit(0)         
+    fd = open(COOKIE_FILE)
+    for line in fd:
+        elem = re.sub(r'^#HttpOnly_', '', line.rstrip()).split()
+        if len(elem) == 7:
+            cookie_obj = requests.cookies.create_cookie(domain=elem[0],name=elem[5],value=elem[6])
+            session.cookies.set_cookie(cookie_obj)
+    headers={'Accept': 'application/json',"Content-Type": "application/json; charset=UTF-8", "Content-Encoding": 'amz-1.0', "X-Amz-Target": "IsengardService.Hello"}
+    return request_follow_redirects(session, url, headers=headers, data={})
+   
+ 
+response = test_isengard_hello("https://proxima-device-tracker.onrender.com/")
